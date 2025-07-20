@@ -1,6 +1,6 @@
 # Voronoi Stippling
 
-Based on the Coding Train's p5.js coding challenge!:
+Playground for voronoi diagram/voronoi stippling art with configurable point count, coloring, point sizing, image uploads, and live video. Based on the Coding Train's p5.js coding challenge:
 https://thecodingtrain.com/challenges/181-image-stippling
 
 Try it out:
