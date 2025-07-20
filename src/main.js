@@ -11,8 +11,14 @@ let animationFrameId = null;
 
 let imgCanvas = document.createElement("canvas");
 
+const video = document.getElementById("video");
+let isVideoMode = false;
+
 const canvas = document.getElementById("canvas");
+
 const colorToggle = document.getElementById("colorToggle");
+const polyToggle = document.getElementById("polyToggle");
+
 const minRadiusSlider = document.getElementById("minRadius");
 const maxRadiusSlider = document.getElementById("maxRadius");
 
@@ -96,6 +102,7 @@ function loadImageAndStart(img) {
   setup();
   draw();
 }
+
 function setup() {
   delaunay = Delaunay.from(seedPoints);
   voronoi = delaunay.voronoi([0, 0, canvas.width, canvas.height]);
@@ -104,48 +111,75 @@ function setup() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  if (isVideoMode) {
+    imgCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  }
+  imageData = imgCtx.getImageData(0, 0, canvas.width, canvas.height).data;
+
   const useColor = colorToggle.checked;
+  const drawPoly = polyToggle.checked;
   const MIN_POINT_RADIUS = parseFloat(minRadiusSlider.value);
   const MAX_POINT_RADIUS = parseFloat(maxRadiusSlider.value);
 
   // draw seed points
-  for (let idx = 0; idx < seedPoints.length; idx++) {
-    const v = seedPoints[idx];
+  if (!drawPoly) {
+    for (let idx = 0; idx < seedPoints.length; idx++) {
+      const v = seedPoints[idx];
 
-    const imageSampleX = Math.floor(v[0]);
-    const imageSampleY = Math.floor(v[1]);
+      const imageSampleX = Math.floor(v[0]);
+      const imageSampleY = Math.floor(v[1]);
 
-    const index = (imageSampleY * canvas.width + imageSampleX) * 4;
-    const r = imageData[index];
-    const g = imageData[index + 1];
-    const b = imageData[index + 2];
-    const brightness = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      const index = (imageSampleY * canvas.width + imageSampleX) * 4;
+      const r = imageData[index];
+      const g = imageData[index + 1];
+      const b = imageData[index + 2];
+      const brightness = 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
-    const t = brightness / 255;
-    const inv = 1 - t;
+      const t = brightness / 255;
+      const inv = 1 - t;
 
-    const radius =
-      MIN_POINT_RADIUS + inv * (MAX_POINT_RADIUS - MIN_POINT_RADIUS);
+      const radius =
+        MIN_POINT_RADIUS + inv * (MAX_POINT_RADIUS - MIN_POINT_RADIUS);
 
-    const color = useColor ? `rgb(${r}, ${g}, ${b})` : "black";
-    ctx.globalAlpha = 0.9;
-    drawPoint(ctx, v[0], v[1], color, radius);
+      const color = useColor ? `rgb(${r}, ${g}, ${b})` : "black";
+      ctx.globalAlpha = 0.9;
+
+      drawPoint(ctx, v[0], v[1], color, radius);
+    }
   }
 
   let polygons = voronoi.cellPolygons();
   let cells = Array.from(polygons);
 
-  // // draw voronoi diagram (polygons) around points
+  if (drawPoly) {
+    // draw voronoi diagram (polygons) around points
+    for (let i = 0; i < cells.length; i++) {
+      const poly = cells[i];
+      ctx.beginPath();
+      ctx.moveTo(poly[0][0], poly[0][1]);
+      for (let i = 1; i < poly.length; i++) {
+        ctx.lineTo(poly[i][0], poly[i][1]);
+      }
+      ctx.closePath();
 
-  // for (let poly of cells) {
-  //   ctx.beginPath();
-  //   ctx.moveTo(poly[0][0], poly[0][1]);
-  //   for (let i = 1; i < poly.length; i++) {
-  //     ctx.lineTo(poly[i][0], poly[i][1]);
-  //   }
-  //   ctx.closePath();
-  //   ctx.stroke();
-  // }
+      if (useColor) {
+        const v = seedPoints[i];
+
+        const imageSampleX = Math.floor(v[0]);
+        const imageSampleY = Math.floor(v[1]);
+
+        const index = (imageSampleY * canvas.width + imageSampleX) * 4;
+        const r = imageData[index];
+        const g = imageData[index + 1];
+        const b = imageData[index + 2];
+        const color = `rgb(${r}, ${g}, ${b})`;
+        ctx.fillStyle = color;
+        ctx.fill();
+      } else {
+        ctx.stroke();
+      }
+    }
+  }
 
   // weighted
 
@@ -184,8 +218,14 @@ function draw() {
     }
   }
 
+  for (let i = 0; i < centroids.length; i++) {}
+
   for (let idx = 0; idx < seedPoints.length; idx++) {
-    seedPoints[idx] = lerp(seedPoints[idx], centroids[idx], 0.1);
+    if (isVideoMode) {
+      seedPoints[idx] = lerp(seedPoints[idx], centroids[idx], 1);
+    } else {
+      seedPoints[idx] = lerp(seedPoints[idx], centroids[idx], 0.5);
+    }
   }
 
   delaunay = Delaunay.from(seedPoints);
@@ -193,20 +233,66 @@ function draw() {
   animationFrameId = requestAnimationFrame(draw);
 }
 
-// load in image then get voronoi
-const img = new Image();
-img.src = "/cat-square.jpg";
+async function stopVideoStippling() {
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
 
-img.onload = async () => {
-  await customElements.whenDefined("sl-range");
-  await Promise.all([
-    minRadiusSlider.updateComplete,
-    maxRadiusSlider.updateComplete,
-    numPointsSlider.updateComplete,
-  ]);
+    video.pause();
+    isVideoMode = false;
+    loadInitial();
+  }
+}
 
-  loadImageAndStart(img);
-};
+async function startVideoStippling() {
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
+  }
+
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  video.srcObject = stream;
+
+  await video.play();
+
+  isVideoMode = true;
+
+  const drawWidth = video.videoWidth;
+  const drawHeight = video.videoHeight;
+
+  canvas.width = drawWidth;
+  canvas.height = drawHeight;
+  imgCanvas.width = drawWidth;
+  imgCanvas.height = drawHeight;
+
+  imgCtx = imgCanvas.getContext("2d");
+
+  numPointsSlider.value = 1000;
+  maxRadiusSlider.value = 5;
+
+  regenerateStipplePoints();
+  setup();
+  draw();
+}
+
+function loadInitial() {
+  // load in image then get voronoi
+  const img = new Image();
+  img.src = img.src = `${import.meta.env.BASE_URL}cat-square.jpg`;
+
+  img.onload = async () => {
+    await customElements.whenDefined("sl-range");
+    await Promise.all([
+      minRadiusSlider.updateComplete,
+      maxRadiusSlider.updateComplete,
+      numPointsSlider.updateComplete,
+    ]);
+
+    loadImageAndStart(img);
+  };
+}
+
+loadInitial();
 
 // event handlers
 
@@ -217,6 +303,14 @@ imageUploadInput.addEventListener("change", (e) => {
   canvas.style.display = "none";
   controls.style.display = "none";
   loader.style.display = "inline-block";
+
+  // stop video if playing
+
+  if (video) {
+    video.pause();
+    videoBtn.innerText = "Live Video";
+  }
+  isVideoMode = false;
 
   const reader = new FileReader();
   reader.onload = (event) => {
@@ -237,4 +331,15 @@ numPointsSlider.addEventListener("input", () => {
 restartBtn.addEventListener("click", () => {
   regenerateStipplePoints();
   setup();
+});
+
+const videoBtn = document.getElementById("video-btn");
+videoBtn.addEventListener("click", () => {
+  if (!isVideoMode) {
+    startVideoStippling();
+    videoBtn.innerText = "Stop Video";
+  } else {
+    stopVideoStippling();
+    videoBtn.innerText = "Live Video";
+  }
 });

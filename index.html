@@ -24,7 +24,7 @@
   </head>
   <body>
     <nav>
-      <h1>Voro<span class="highlight-text">noi</span></h1>
+      <h1>Voronoi</h1>
     </nav>
     <div id="app">
       <div class="controls" id="controls">
@@ -55,14 +55,16 @@
         ></sl-range>
         <span class="checks">
           <sl-checkbox id="colorToggle">With Color</sl-checkbox>
-          <sl-checkbox id="colorToggle">With Polygons</sl-checkbox>
+          <sl-checkbox id="polyToggle">With Polygons</sl-checkbox>
         </span>
         <input type="file" id="imageUpload" accept="image/*" />
+        <sl-button id="video-btn">Live Video</sl-button>
         <sl-button id="restart-btn">Reseed Points</sl-button>
       </div>
       <canvas id="canvas"></canvas>
       <span id="loader" class="loader"></span>
     </div>
+    <video id="video" autoplay playsinline muted style="display: none"></video>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
