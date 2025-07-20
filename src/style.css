@@ -48,6 +48,7 @@ canvas {
 }
 
 .loader {
+  align-self: center;
   width: 48px;
   height: 48px;
   border: 5px solid #cfcfcf;
